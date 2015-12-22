@@ -1,0 +1,432 @@
+// Author: Jinho Seo
+// Date: 12-13-2015
+// Contact: brownkpt60@gmail.com
+// Description: Virtual Machine LAB:4 - ver6.0
+/*
+future work
+1.dispaly folder directory, for user to input file names to operate the CPU  // system("dir /a/p") ??
+2.Using <map> to upgrade program
+3.Create functions to make more clear code.
+4.JUMP functions
+5.Validate Store Data features, if(operand = acc) error
+*/
+
+#include <iostream>
+#include <iomanip>		// setw(), etc..
+#include <fstream>		// file system
+#include <string>		// string library
+#include <vector>		// vector librar
+#include <algorithm>	
+using namespace std;
+
+int operand;	  // e.g) LOAD 14, 14 is operand - number
+int acc;	   	  // accumulator, main cpu register
+int opcode;		  // instruction register or operation code
+int pc;		      // program counter
+
+const int ABOUT = '0';
+const int LOAD_DATA = '1';
+const int DISPLAY_DATA = '2';
+const int CLEAR_DATA = '3';
+const int CREATE_DATA = '4';
+const int QUIT = 'Q';
+
+const int CLR = 10;		// acc = 0  , clear the data
+const int LOAD = 11;	// not impleamented - Load datas
+const int STORE = 12;	// Store datas 
+const int ADD = 13;		// acc = acc + operand
+const int SUB = 14;		// acc = acc - operand
+const int DIV = 15;		// acc = acc / operand ( operand != 0 )
+const int MUL = 16;		// acc = acc * operand
+const int OUT = 88;		// Dispaly ACC (result)
+const int HALT = 0xF4;  // actual HEX opcode to hlt cpu 244
+const int JUMP = 66;	// pc = jumps' operand
+const int BNZ = 77;		// branch not zero location. if (acc != 0) pc = operand
+//const int BZ = 8; // Branch zero operand. if (acc == 0) pc = operand
+
+bool isValidChoice(const char);
+char menu();			// menu function
+void execute(int);		// library of excute operation.
+void CPU_Process(int);  // CPU process - acc
+void About();
+void Creat_Data(); 
+void Load_Data();
+void Clear_Data();
+void Display_Data();
+void Display_CPU();		// diaplay human readable CPU machine code.
+
+vector<int> vinput_RAM(0);  // save dates for lorading data
+vector<int> Store_data(0);  // save dates from "STORE" - multi data
+vector<int> ::iterator it;
+
+int main()
+{
+	char command;
+	do
+	{
+		command = menu();
+		execute(command);
+
+		system("pause");
+	} while (toupper(command)!=QUIT);
+			
+	//system("pause");
+	return 0;
+}
+
+char menu()
+{
+	char choice;
+	do{
+		system("cls");										// clear screen	
+		cout << "Virtual CPU LAB4 - ver 6.0 " << endl;		// dispaly menu
+		cout << "0 . . . About" << endl;
+		cout << "1 . . . Load_Data" << endl;
+		cout << "2 . . . Display_Data" << endl;
+		cout << "3 . . . Clear_Data" << endl;
+		cout << "4 . . . Create_Data" << endl;
+		cout << "Q . . . Quit" << endl << endl;
+
+		cout << "Please select menu above : ";
+		cin >> choice;
+	
+		choice = int(toupper(choice));
+
+	} while (isValidChoice(choice));
+
+	return choice;											// return user's choice
+}
+
+bool isValidChoice(const char c)
+{
+	return !(c == ABOUT || c == LOAD_DATA || c == DISPLAY_DATA || c== CREATE_DATA || c== CLEAR_DATA || c == QUIT);
+}
+
+void About()
+{
+	cout << "\nWelcome !! " << endl;
+	cout << "Virtual CPU LAB4 - ver6.0" << endl;
+	cout << "\nDevloper: JINHO SEO" << endl;
+	cout << "Conctact: brownkpt60@gmail.com" << endl;
+	cout << "Copyright 2015 JINHO SEO. All rights reserved." << endl << endl;
+
+	cout << "------------------------------------------------" << endl;
+	cout << "\nVirtual Machine Ver 6.0" << endl;
+	cout << " - Fix the problem at Store & Load process(break statement)" << endl;
+	cout << " - Arranges diaply messages to make more clear look" << endl;
+	cout << " - Fix bugs : Clear_Data function has failed to initialized variables." << endl;
+	cout << endl;
+
+	return;
+}
+
+void Load_Data()
+{
+	string filename;
+	string word;		// store data from the file
+			
+	cout << "\nList of File " << endl;
+	cout << "File name : data1.txt"  << endl;
+	cout << "File name : data2.txt" << endl;
+	cout << "File name : data3.txt" << endl;
+
+	cout << "\nPlease Enter File name to load : ";
+	cin >> filename;
+
+	ifstream infile(filename.c_str());   // c.str() allows STRING(vaiable type) to be used as parameters.
+	
+	// validate file.
+	if (!infile.is_open()){ 
+		cout << "\nFile could not opened" << endl;
+		cout << "Please try again\n" << endl;
+	}
+	else
+	{
+		cout << "\nFile : " << filename << endl;
+		cout << "---------------------- " << endl;
+		cout << "Process begin..." << endl;
+
+		while (!infile.eof())					 // store data one by one, to string word, each elements distinguish by space
+		{
+			infile >> word;						// data load to store into string variable.
+
+			if (word == "CLR"){
+				vinput_RAM.push_back(CLR);   	// word<sting> to const <int> value of opcode : CLR = 10
+			}
+			else if (word == "ADD"){
+				vinput_RAM.push_back(ADD);
+				infile >> operand;				// data load to operand
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "SUB"){
+				vinput_RAM.push_back(SUB);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "DIV"){
+				vinput_RAM.push_back(DIV);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "MUL"){
+				vinput_RAM.push_back(MUL);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "OUT"){
+				vinput_RAM.push_back(OUT);
+			}
+			else if (word == "HALT"){				// stop
+				vinput_RAM.push_back(HALT);
+				cout << "CPU Halting..." << endl;
+				break;
+			}
+			else if (word == "STORE"){
+				vinput_RAM.push_back(STORE);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "LOAD"){
+				vinput_RAM.push_back(LOAD);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "JUMP"){
+				vinput_RAM.push_back(JUMP);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+			else if (word == "BNZ"){
+				vinput_RAM.push_back(BNZ);
+				infile >> operand;
+				vinput_RAM.push_back(operand);
+			}
+		}
+		infile.close(); // file close.
+		cout << "Data Loaded" << endl;
+		cout << "---------------------- " << endl;
+	}
+
+	//test run	
+	/*
+	cout << "Test run" << endl;
+	for (it = vinput_RAM.begin(); it != vinput_RAM.end(); it++)
+	{
+		cout << *it << endl;
+	}
+	*/
+	
+	return;
+}
+
+void Create_Data()
+{
+	string out_filename;
+	string data;
+	
+	cout << "\nPlease Enter Create File name(.txt) : ";  // user create own file name
+	cin >> out_filename;
+	ofstream outfile(out_filename.c_str());
+
+	if (!outfile.is_open()){ cout << "File could not be created " << endl;} // vaildate file.
+	else
+	{
+		cout << "-------------------------" << endl;
+		cout << "File open" << endl;
+		Display_CPU(); // display humand readable data 
+		cout << "Type 'HALT' to exit" << endl;
+		cout << "-------------------------" << endl;
+		do
+		{
+			getline(cin, data);
+			transform(data.begin(), data.end(), data.begin(), toupper); // transform lowercase to uppercase
+			outfile << data << '\n';
+
+		} while (data !=("HALT"));
+	}	
+	outfile.close(); // file close
+	cout << "-------------------------" << endl;
+	cout << "File Created\n" << endl;
+}
+
+void Display_CPU()
+{
+	cout << "\n-------------------------" << endl;
+	cout << setw(10) << "CLR = 10" << '\t' << "JUMP= 66" << endl;
+	cout << setw(10) << "ADD = 13" << '\t' << "LOAD = 11" << endl;
+	cout << setw(10) << "SUB = 14" << '\t' << "STORE = 12" << endl;
+	cout << setw(10) << "MUL = 16" << '\t' << "HALT = 244" << endl;
+	cout << setw(10) << "DIV = 15" << '\t' << endl;
+	cout << setw(10) << "OUT = 88" << '\t' << endl;
+	cout << setw(10) << "BNZ = 77" << '\t' << endl;
+	cout << "-------------------------" << endl;
+	
+	return;
+}
+
+void Display_Data()
+{
+	// vaildate user input
+	unsigned n = vinput_RAM.size();
+	if (n != 0)
+	{		
+	Display_CPU();			// display cpu
+	pc = 0;					// program counter to 0
+		do{
+			opcode = vinput_RAM[pc];
+			CPU_Process(opcode);
+		} while (opcode != HALT);
+
+	}
+	else{
+		cout << "\nData load failed..." << endl;
+		cout << "\n!! Please load Data First !!" << endl;
+	}
+	return;
+	
+}
+
+void CPU_Process(int opcode)
+{
+	switch (opcode){
+	case CLR:
+		acc = 0;
+		cout << "Opcode : " << opcode << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case ADD:
+		operand = vinput_RAM[++pc];
+		acc += operand;
+		cout << "Opcode : " << opcode << endl;
+		cout << "Operand : " << operand << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case SUB:
+		operand = vinput_RAM[++pc];
+		acc -= operand;
+		cout << "Opcode : " << opcode << endl;
+		cout << "Operand : " << operand << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case MUL:
+		operand = vinput_RAM[++pc];
+		acc *= operand;
+		cout << "Opcode : " << opcode << endl;
+		cout << "Operand : " << operand << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case DIV:
+		operand = vinput_RAM[++pc];
+		if (operand != 0){
+			acc /= operand;
+			cout << "Opcode : " << opcode << endl;
+			cout << "Operand : " << operand << endl;
+			cout << "ACC : " << acc << endl;
+			cout << "-------------" << endl;
+			pc++;
+			break;
+		}
+		else{
+			cout << "Please check your File... ACC error( cannot divide by 0 )" << endl;
+			break;
+		}
+	case OUT:
+		//cout << "---------------------- " << endl;
+		cout << "Opcode : " << opcode << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case HALT:
+		cout << "Opcode : " << opcode << endl;
+		cout << "CPU Halting..." << endl;
+		cout << "-------------" << endl;
+		cout << "ACC : " << acc << endl;
+		break;
+	case STORE:
+		operand = vinput_RAM[++pc];		// load up the operand
+		Store_data.push_back(operand);  // store operand to another vector array(Store_data)
+										// which makes possibility to store multipul datas & load.
+		Store_data.push_back(acc);     // store data to Store_data vector
+		cout << "Data Stored" << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		pc++;
+		break;
+	case LOAD:
+		operand = vinput_RAM[++pc];
+		it = find(Store_data.begin(), Store_data.end(), operand); // iterator to find operand stored in vector
+		acc = *(it + 1); 				  // move 1 memory location to access acc that stored followed by operand
+		pc++;
+		cout << "Data Loaded" << endl;
+		cout << "ACC : " << acc << endl;
+		cout << "-------------" << endl;
+		break;
+	case BNZ:
+		operand = vinput_RAM[++pc];
+		if (acc != 0) pc = operand;
+		else pc++;
+		break;
+	case JUMP:
+		operand = vinput_RAM[++pc];
+		pc = operand;
+		pc++;
+		break;
+	
+	}
+	return;
+}
+
+void Clear_Data()
+{
+	// initialize variable to 0, clear all the data
+	vinput_RAM.clear(); // clear contents 
+	Store_data.clear(); 
+	opcode = 0; 
+	operand = 0;
+	pc = 0;
+	acc = 0;
+	
+	cout << "\nData Cleared!!\n" << endl;
+	
+	/* 
+	//test run
+	cout << "vinput_RAM - Vector size : " << vinput_RAM.size() << endl; 
+	cout << "Store_Date - Vector size : " << Store_data.size() << endl;
+	cout << "Opcode : " << opcode << endl;
+	cout << "Operand : " << operand << endl;
+	cout << "PC : " << pc << endl;
+	cout << "ACC : " << acc << endl;
+	*/
+	return;
+}
+
+void execute(int command)		
+{
+	switch (toupper(command))
+	{
+	case ABOUT :
+		About();
+		break;
+	case DISPLAY_DATA:
+		Display_Data();
+		break;
+	case LOAD_DATA:
+		Load_Data();
+		break;
+	case CREATE_DATA:
+		Create_Data();
+		break;
+	case CLEAR_DATA:
+		Clear_Data();
+	}
+	return;
+}
